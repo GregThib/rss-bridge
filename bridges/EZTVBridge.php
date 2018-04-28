@@ -45,8 +45,10 @@ on EZTV. Get showID from URLs in https://eztv.ch/shows/showID/show-full-name.';
 				$ep = $element->find('td', 1);
 				if(empty($ep)) continue;
 				$epinfo = $ep->find('.epinfo', 0);
-				$released = $element->find('td', 3);
 				if(empty($epinfo)) continue;
+				$download = $element->find('td', 2);
+				$magnet = $download->find('a.magnet', 0);
+				$released = $element->find('td', 3);
 				if(empty($released->plaintext)) continue;
 
 				// Filter entries that are older than 1 week
@@ -54,7 +56,7 @@ on EZTV. Get showID from URLs in https://eztv.ch/shows/showID/show-full-name.';
 
 				// Fill item
 				$item = array();
-				$item['uri'] = self::URI . $epinfo->href;
+				$item['uri'] = $magnet->href;
 				$item['id'] = $item['uri'];
 				$item['timestamp'] = makeTimestamp($released->plaintext);
 				$item['title'] = $epinfo->plaintext;
