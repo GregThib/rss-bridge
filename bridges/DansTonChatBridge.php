@@ -17,9 +17,9 @@ class DansTonChatBridge extends BridgeAbstract {
 			$item['uri'] = $element->find('a', 0)->href;
 			$titleContent = $element->find('h3 a', 0);
 			if($titleContent) {
-				$item['title'] = 'DansTonChat ' . html_entity_decode($titleContent->plaintext, ENT_QUOTES);
+				$item['title'] = 'DTC : ' . html_entity_decode($titleContent->plaintext, ENT_QUOTES);
 			} else {
-				$item['title'] = 'DansTonChat';
+				$item['title'] = 'DTC';
 			}
 			$item['content'] = $element->find('div.item-content a', 0)->innertext;
 			$this->items[] = $item;
