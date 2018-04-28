@@ -20,6 +20,12 @@
 */
 class MediapartBridge extends BridgeAbstract{
 	
+	const NAME = 'Mediapart';
+	const URI = 'https://www.mediapart.fr';
+	const DESCRIPTION = 'Mediapart via rss-bridge';
+	const MAINTAINER = 'Greg Thib';
+	const CACHE_TIMEOUT = 3600; // 1 hour
+	
 	// maximum articles to fetch by a unique call
 	const FETCH_LIMIT = 5;
 	
@@ -97,7 +103,8 @@ class MediapartBridge extends BridgeAbstract{
 			elseif(curl_errno($ch) == 1) // failure : not HTTPS follow value
 				curl_setopt($ch, CURLOPT_URL, $httplocation);
 			else
-				$this->returnError('Submission failed w/ curl_error ('.curl_errno($ch).') =\"'.curl_error($ch).'"',500);
+				$this->returnError('Submission failed w/ curl_error ('.curl_errno($ch).') 
+=\"'.curl_error($ch).'"',500);
 		}
 		curl_close($ch);
 		
@@ -149,10 +156,12 @@ class MediapartBridge extends BridgeAbstract{
 		$html= '';
 		
 		// fetch full content
-		$html = file_get_contents($url.'?onglet=full', false, $session) or $this->returnError('Error during fetch_full_content', 500);
+		$html = file_get_contents($url.'?onglet=full', false, $session) or $this->returnError('Error during 
+fetch_full_content', 500);
 		$html = in_array("Content-Encoding: gzip",$http_response_header) ? gzdecode($html) : $html;
 		$html = str_get_html($html);
-//		$html = file_get_html($url.'?onglet=full', false, $session) or $this->returnError('Error during fetch_full_content', 500);
+//		$html = file_get_html($url.'?onglet=full', false, $session) or $this->returnError('Error during 
+fetch_full_content', 500);
 		
 /////////////// CETAIT MIEUX AVANT
 //                // if not connected, try to log on
@@ -161,7 +170,8 @@ class MediapartBridge extends BridgeAbstract{
 		// if not connected, try to log on
 		if($html->find('form[id=logFormEl]', 0)) {
 			if($session = $this->submitAuthForm($html, $user, $pass))
-				$html = file_get_html($url.'?onglet=full', false, $session) or $this->returnError('Error during fetch_full_content', 500);
+				$html = file_get_html($url.'?onglet=full', false, $session) or $this->returnError('Error 
+during fetch_full_content', 500);
 			else
 				$this->returnError('Credentials didn\'t works!', 404);
 		}
@@ -183,8 +193,10 @@ class MediapartBridge extends BridgeAbstract{
 //echo file_get_contents($url.'?onglet=full', false, $session);
  		$head = $html->find('div.introduction', 0)->innertext;
 /////////////// CETAIT MIEUX AVANT
-//		$text = $html->find('div.content-article', 0)->innertext or $this->returnError('Content not found on article', 404);
-		if( !($text = $html->find('div.content-article', 0)->innertext) && !($text = $html->find('div.content-podcast', 0)->innertext) )
+//		$text = $html->find('div.content-article', 0)->innertext or $this->returnError('Content not found on article', 
+404);
+		if( !($text = $html->find('div.content-article', 0)->innertext) && !($text = 
+$html->find('div.content-podcast', 0)->innertext) )
 			$this->returnError('Content not found on article', 404);
 /////////////// FAUDRA REMETTRE UNE LOGIQUE
 		return '<b>'.$head.'</b>'.$text;
@@ -193,14 +205,15 @@ class MediapartBridge extends BridgeAbstract{
 	public function collectData(array $param) {
 		// check params
 		if (!isset($param['user']) || !isset($param['pass']))
-			$this->returnError('You must specify your credentials', 400);
+			returnClientError('You must specify your credentials');
 		
 		// get session token
 		$creds   = $this->obfuscateCreds($param['user'],$param['pass']);
 		$session = $this->getSessionToken($creds);
 		
 		// get Mediapart feed
-		$html = file_get_html('https://www.mediapart.fr/articles/feed') or $this->returnError('Could not request Mediapart.', 404);
+		$html = getSimpleHTMLDOM($this->getURI().'/articles/feed')
+			or $this->returnServerError('Could not request ' . $this->getName());
 		
 		// fetch items
 		$limit = 0;
@@ -219,17 +232,5 @@ class MediapartBridge extends BridgeAbstract{
 				$this->items[]   = $item;
 			}
 		}
-	}
-
-	public function getName(){
-		return 'Mediapart';
-	}
-
-	public function getURI(){
-		return 'https://www.mediapart.fr';
-	}
-
-	public function getCacheDuration(){
-		return 3600; // 1 hour
 	}
 }
