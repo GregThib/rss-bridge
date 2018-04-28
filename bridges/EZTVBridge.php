@@ -45,20 +45,26 @@ on EZTV. Get showID from URLs in https://eztv.ch/shows/showID/show-full-name.';
 				$ep = $element->find('td', 1);
 				if(empty($ep)) continue;
 				$epinfo = $ep->find('.epinfo', 0);
-				$released = $element->find('td', 3);
 				if(empty($epinfo)) continue;
+				$download = $element->find('td', 2);
+				if(empty($download->innertext)) continue;
+				$released = $element->find('td', 4);
 				if(empty($released->plaintext)) continue;
 
 				// Filter entries that are older than 1 week
-				if($released->plaintext == '&gt;1 week') continue;
+				if(preg_match('/week|mo|year/',$released->plaintext)) continue;
+
+				// add icons to links
+				$download->find('a.magnet', 0)->innertext = "<img src='https://eztv.ag/images/magnet-icon-5.png'/>";
+				$download->find('a.download_1', 0)->innertext = "<img src='https://eztv.ag/images/download_11.png'/>";
 
 				// Fill item
 				$item = array();
-				$item['uri'] = self::URI . $epinfo->href;
+				$item['uri'] = $download->find('a.magnet', 0)->href;
 				$item['id'] = $item['uri'];
 				$item['timestamp'] = makeTimestamp($released->plaintext);
 				$item['title'] = $epinfo->plaintext;
-				$item['content'] = $epinfo->alt;
+				$item['content'] = $download->innertext . $epinfo->alt;
 				if(isset($item['title']))
 					$this->items[] = $item;
 			}

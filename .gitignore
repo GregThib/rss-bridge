@@ -227,6 +227,9 @@ pip-log.txt
 /cache
 /whitelist.txt
 DEBUG
+/.htaccess
+/.htdigest
+/.htpasswd
 
 ######################
 ## VisualStudioCode ##
