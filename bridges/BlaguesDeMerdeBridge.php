@@ -1,48 +1,31 @@
 <?php
-/**
-*
-* @name Blagues De Merde
-* @homepage http://www.blaguesdemerde.fr/
-* @description Blagues De Merde
-* @update 16/10/2013
-* initial maintainer: superbaillot.net
-*/
-class BlaguesDeMerdeBridge extends BridgeAbstract{
+class BlaguesDeMerdeBridge extends BridgeAbstract {
 
-    public function collectData(array $param){
-        $html = file_get_html('http://www.blaguesdemerde.fr/') or $this->returnError('Could not request BDM.', 404);
-    
-        foreach($html->find('article.joke_contener') as $element) {
-            $item = new Item();
-            $temp = $element->find('a');
-            if(isset($temp[2]))
-            {
-                $item->content = trim($element->find('div.joke_text_contener', 0)->innertext);
-                $uri = $temp[2]->href;
-                $item->uri = $uri;
-                $item->title = substr($uri, (strrpos($uri, "/") + 1));
-                $date = $element->find("li.bdm_date",0)->innertext;
-                $time = mktime(0, 0, 0, substr($date, 3, 2), substr($date, 0, 2), substr($date, 6, 4));
-                $item->timestamp = $time;
-                $item->name = $element->find("li.bdm_pseudo",0)->innertext;;
-                $this->items[] = $item;
-            }
-        }
-    }
+	const MAINTAINER = 'superbaillot.net';
+	const NAME = 'Blagues De Merde';
+	const URI = 'http://www.blaguesdemerde.fr/';
+	const CACHE_TIMEOUT = 7200; // 2h
+	const DESCRIPTION = 'Blagues De Merde';
 
-    public function getName(){
-        return 'blaguesdemerde';
-    }
+	public function collectData(){
+		$html = getSimpleHTMLDOM(self::URI)
+			or returnServerError('Could not request BDM.');
 
-    public function getURI(){
-        return 'http://www.blaguesdemerde.fr/';
-    }
+		foreach($html->find('article.joke_contener') as $element) {
+			$item = array();
+			$temp = $element->find('a');
 
-    public function getCacheDuration(){
-        return 7200; // 2h hours
-    }
-    public function getDescription(){
-        return "Blagues De Merde via rss-bridge";
-    }
+			if(isset($temp[2])) {
+				$item['content'] = trim($element->find('div.joke_text_contener', 0)->innertext);
+				$uri = $temp[2]->href;
+				$item['uri'] = $uri;
+				$item['title'] = substr($uri, (strrpos($uri, "/") + 1));
+				$date = $element->find('li.bdm_date', 0)->innertext;
+				$time = mktime(0, 0, 0, substr($date, 3, 2), substr($date, 0, 2), substr($date, 6, 4));
+				$item['timestamp'] = $time;
+				$item['author'] = $element->find('li.bdm_pseudo', 0)->innertext;
+				$this->items[] = $item;
+			}
+		}
+	}
 }
-?>

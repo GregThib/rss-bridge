@@ -1,44 +1,36 @@
 <?php
-/**
-*
-* @name Dilbert Daily Strip
-* @homepage http://dilbert.com/strips/
-* @description The Unofficial Dilbert Daily Comic Strip
-* @update 30/01/2015
-* initial maintainer: superbaillot.net
-* @maintainer kranack
-*/
-class DilbertBridge extends BridgeAbstract{
+class DilbertBridge extends BridgeAbstract {
 
-    public function collectData(array $param){
-        $html = file_get_html('http://dilbert.com/strips/') or $this->returnError('Could not request Dilbert.', 404);
+	const MAINTAINER = 'kranack';
+	const NAME = 'Dilbert Daily Strip';
+	const URI = 'http://dilbert.com';
+	const CACHE_TIMEOUT = 21600; // 6h
+	const DESCRIPTION = 'The Unofficial Dilbert Daily Comic Strip';
 
-        foreach($html->find('section.comic-item') as $element) {
-            $comic = $element->find('img', 0);
+	public function collectData(){
 
-            $item = new Item();
-            $item->uri = $element->find('a',0)->href;
-            $item->content = '<img src="'. $comic->src . '" alt="' . $comic->alt . '" />';
-            $item->title = $comic->alt;
-            $item->timestamp = strtotime($element->find('h3', 0)->plaintext);
-            $this->items[] = $item;
-        }
-    }
+		$html = getSimpleHTMLDOM($this->getURI())
+			or returnServerError('Could not request Dilbert: ' . $this->getURI());
 
-    public function getName(){
-        return 'Dilbert';
-    }
+		foreach($html->find('section.comic-item') as $element) {
 
-    public function getURI(){
-        return 'http://dilbert.com';
-    }
+			$img = $element->find('img', 0);
+			$link = $element->find('a', 0);
+			$comic = $img->src;
+			$title = $link->alt;
+			$url = $link->href;
+			$date = substr($url, 25);
+			if (empty($title))
+				$title = 'Dilbert Comic Strip on ' . $date;
+			$date = strtotime($date);
 
-    public function getDescription(){
-        return 'Dilbert via rss-bridge';
-    }
-
-    public function getCacheDuration(){
-        return 14400; // 4 hours
-    }
+			$item = array();
+			$item['uri'] = $url;
+			$item['title'] = $title;
+			$item['author'] = 'Scott Adams';
+			$item['timestamp'] = $date;
+			$item['content'] = '<img src="' . $comic . '" alt="' . $img->alt . '" />';
+			$this->items[] = $item;
+		}
+	}
 }
-?>

@@ -1,52 +1,45 @@
 <?php
-/**
-* RssBridgeCryptome
-* Retrieve lastest documents from Cryptome.
-* Returns the N most recent documents, sorting by date (most recent first).
-* 2014-05-25
-*
-* @name Cryptome
-* @homepage http://cryptome.org/
-* @description Returns the N most recent documents.
-* @maintainer BoboTiG
-* @use1(n="number")
-*/
-class CryptomeBridge extends BridgeAbstract{
+class CryptomeBridge extends BridgeAbstract {
 
-    public function collectData(array $param){
-        $html = '';
-        $num = 20;
-        $link = 'http://cryptome.org/';
-        // If you want HTTPS access instead, uncomment the following line:
-        //$link = 'https://secure.netsolhost.com/cryptome.org/';
+	const MAINTAINER = 'BoboTiG';
+	const NAME = 'Cryptome';
+	const URI = 'https://cryptome.org/';
+	const CACHE_TIMEOUT = 21600; //6h
+	const DESCRIPTION = 'Returns the N most recent documents.';
 
-        $html = file_get_html($link) or $this->returnError('Could not request Cryptome.', 404);
-        if (!empty($param['n'])) {   /* number of documents */
-            $num = min(max(1, $param['n']+0), $num);
-        }
+	const PARAMETERS = array( array(
+		'n' => array(
+			'name' => 'number of elements',
+			'type' => 'number',
+			'defaultValue' => 20,
+			'exampleValue' => 10
+		)
+	));
 
+	public function collectData(){
+		$html = getSimpleHTMLDOM(self::URI)
+			or returnServerError('Could not request Cryptome.');
 
-        foreach($html->find('pre') as $element) {
-            for ( $i = 0; $i < $num; ++$i ) {
-                $item = new \Item();
-                $item->uri = $link.substr($element->find('a', $i)->href, 20);
-                $item->title = substr($element->find('b', $i)->plaintext, 22);
-                $item->content = preg_replace('#http://cryptome.org/#', $link, $element->find('b', $i)->innertext);
-                $this->items[] = $item;
-            }
-            break;
-        }
-    }
+		$number = $this->getInput('n');
 
-    public function getName(){
-        return 'Cryptome';
-    }
+		/* number of documents */
+		if(!empty($number)) {
+			$num = min($number, 20);
+		}
 
-    public function getURI(){
-        return 'https://secure.netsolhost.com/cryptome.org/';
-    }
-
-    public function getCacheDuration(){
-        return 21600; // 6 hours
-    }
+		foreach($html->find('pre') as $element) {
+			for($i = 0; $i < $num; ++$i) {
+				$item = array();
+				$item['uri'] = self::URI . substr($element->find('a', $i)->href, 20);
+				$item['title'] = substr($element->find('b', $i)->plaintext, 22);
+				$item['content'] = preg_replace(
+					'#http://cryptome.org/#',
+					self::URI,
+					$element->find('b', $i)->innertext
+				);
+				$this->items[] = $item;
+			}
+			break;
+		}
+	}
 }

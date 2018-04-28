@@ -1,73 +1,83 @@
 <?php
-/**
-* HDWallpapersBridge
-* Returns the latests wallpapers from http://www.hdwallpapers.in
-*
-* @name HD Wallpapers Bridge
-* @homepage http://www.hdwallpapers.in/
-* @description Returns the latests wallpapers from HDWallpapers
-* @maintainer nel50n
-* @update 2015-04-08
-* @use1(c="category",m="max number of wallpapers",r="resolution (1920x1200, 1680x1050, ...)")
-*/
 class HDWallpapersBridge extends BridgeAbstract {
+	const MAINTAINER = 'nel50n';
+	const NAME = 'HD Wallpapers Bridge';
+	const URI = 'http://www.hdwallpapers.in/';
+	const CACHE_TIMEOUT = 43200; //12h
+	const DESCRIPTION = 'Returns the latests wallpapers from HDWallpapers';
 
-    private $category;
-    private $resolution;
+	const PARAMETERS = array( array(
+		'c' => array(
+			'name' => 'category',
+			'defaultValue' => 'latest_wallpapers'
+		),
+		'm' => array(
+			'name' => 'max number of wallpapers'
+		),
+		'r' => array(
+			'name' => 'resolution',
+			'defaultValue' => '1920x1200',
+			'exampleValue' => '1920x1200, 1680x1050,…'
+		)
+	));
 
-    public function collectData(array $param){
-        $html = '';
-        $baseUri = 'http://www.hdwallpapers.in';
+	public function collectData(){
+		$category = $this->category;
+		if(strrpos($category, 'wallpapers') !== strlen($category) - strlen('wallpapers')) {
+			$category .= '-desktop-wallpapers';
+		}
 
-        $this->category   = $param['c'] ?: 'latest_wallpapers'; // Latest default
-        $this->resolution = $param['r'] ?: '1920x1200';         // Wide wallpaper default
+		$num = 0;
+		$max = $this->getInput('m') ?: 14;
+		$lastpage = 1;
 
-        $category = $this->category;
-        if (strrpos($category, 'wallpapers') !== strlen($category)-strlen('wallpapers')) {
-            $category .= '-desktop-wallpapers';
-        }
+		for($page = 1; $page <= $lastpage; $page++) {
+			$link = self::URI . '/' . $category . '/page/' . $page;
+			$html = getSimpleHTMLDOM($link)
+				or returnServerError('No results for this query.');
 
-        $num = 0;
-        $max = $param['m'] ?: 14;
-        $lastpage = 1;
+			if($page === 1) {
+				preg_match('/page\/(\d+)$/', $html->find('.pagination a', -2)->href, $matches);
+				$lastpage = min($matches[1], ceil($max / 14));
+			}
 
-        for ($page = 1; $page <= $lastpage; $page++) {
-            $link = $baseUri.'/'.$category.'/page/'.$page;
-            $html = file_get_html($link) or $this->returnError('No results for this query.', 404);
+			foreach($html->find('.wallpapers .wall a') as $element) {
+				$thumbnail = $element->find('img', 0);
 
-            if ($page === 1) {
-                preg_match('/page\/(\d+)$/', $html->find('.pagination a', -2)->href, $matches);
-                $lastpage = min($matches[1], ceil($max/14));
-            }
+				$item = array();
+				// http://www.hdwallpapers.in/download/yosemite_reflections-1680x1050.jpg
+				$item['uri'] = self::URI
+				. '/download'
+				. str_replace('wallpapers.html', $this->getInput('r') . '.jpg', $element->href);
 
-            foreach($html->find('.wallpapers .wall a') as $element) {
-                $thumbnail = $element->find('img', 0);
+				$item['timestamp'] = time();
+				$item['title'] = $element->find('p', 0)->text();
+				$item['content'] = $item['title']
+				. '<br><a href="'
+				. $item['uri']
+				. '"><img src="'
+				. self::URI
+				. $thumbnail->src
+				. '" /></a>';
 
-                $item = new \Item();
-                // http://www.hdwallpapers.in/download/yosemite_reflections-1680x1050.jpg
-                $item->uri = $baseUri.'/download'.str_replace('wallpapers.html', $this->resolution.'.jpg', $element->href);
-                $item->timestamp = time();
-                $item->title = $element->find('p', 0)->text();
-                $item->thumbnailUri = $baseUri.$thumbnail->src;
-                $item->content = $item->title.'<br><a href="'.$item->uri.'"><img src="'.$item->thumbnailUri.'" /></a>';
-                $this->items[] = $item;
+				$this->items[] = $item;
 
-                $num++;
-                if ($num >= $max)
-                    break 2;
-            }
-        }
-    }
+				$num++;
+				if ($num >= $max)
+					break 2;
+			}
+		}
+	}
 
-    public function getName(){
-        return 'HDWallpapers - '.str_replace(['__', '_'], [' & ', ' '], $this->category).' ['.$this->resolution.']';
-    }
+	public function getName(){
+		if(!is_null($this->getInput('c')) && !is_null($this->getInput('r'))) {
+			return 'HDWallpapers - '
+			. str_replace(['__', '_'], [' & ', ' '], $this->getInput('c'))
+			. ' ['
+			. $this->getInput('r')
+			. ']';
+		}
 
-    public function getURI(){
-        return 'http://www.hdwallpapers.in';
-    }
-
-    public function getCacheDuration(){
-        return 43200; // 12 hours
-    }
+		return parent::getName();
+	}
 }

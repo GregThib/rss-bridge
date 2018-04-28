@@ -1,58 +1,26 @@
 <?php
-/**
-* RssBridgeCommonDreams
-* Returns the newest articles
-* 2015-04-03
-*
-* @name CommonDreams Bridge
-* @homepage http://www.commondreams.org/
-* @description Returns the newest articles.
-* @maintainer nyutag
-*/
-class CommonDreamsBridge extends BridgeAbstract{
-   
-        public function collectData(array $param){
+class CommonDreamsBridge extends FeedExpander {
 
-		function CommonDreamsUrl($string) {
-		 $html2 = explode(" ", $string);
-		 $string = $html2[2] . "/node/" . $html2[0];
-		 return $string;
-		}
-	
-		function CommonDreamsExtractContent($url) {
-		$html3 = file_get_html($url);
+	const MAINTAINER = 'nyutag';
+	const NAME = 'CommonDreams Bridge';
+	const URI = 'http://www.commondreams.org/';
+	const DESCRIPTION = 'Returns the newest articles.';
+
+	public function collectData(){
+		$this->collectExpandableDatas('http://www.commondreams.org/rss.xml', 10);
+	}
+
+	protected function parseItem($newsItem){
+		$item = parent::parseItem($newsItem);
+		$item['content'] = $this->extractContent($item['uri']);
+		return $item;
+	}
+
+	private function extractContent($url){
+		$html3 = getSimpleHTMLDOMCached($url);
 		$text = $html3->find('div[class=field--type-text-with-summary]', 0)->innertext;
 		$html3->clear();
 		unset ($html3);
 		return $text;
-		}
-
-		$html = file_get_html('http://www.commondreams.org/rss.xml') or $this->returnError('Could not request CommonDreams.', 404);
-		$limit = 0;
-		foreach($html->find('item') as $element) {
-		 if($limit < 4) {
-		 $item = new \Item();
-		 $item->title = $element->find('title', 0)->innertext;
-		 $item->uri = CommonDreamsUrl($element->find('guid', 0)->innertext);
-		 $item->timestamp = strtotime($element->find('pubDate', 0)->plaintext);
-		 $item->content = CommonDreamsExtractContent($item->uri);
-		 $this->items[] = $item;
-		 $limit++;
-		 }
-		}
-    
-    }
-
-    public function getName(){
-        return 'CommonDreams Bridge';
-    }
-
-    public function getURI(){
-        return 'http://www.commondreams.org/';
-    }
-
-    public function getCacheDuration(){
-        return 3600; // 1 hours
-//	return 0;
-    }
+	}
 }

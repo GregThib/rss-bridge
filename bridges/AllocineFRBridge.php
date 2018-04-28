@@ -1,55 +1,87 @@
 <?php
-/**
-*
-* @name Allo Cine : Faux Raccord
-* @homepage http://www.allocine.fr/video/programme-12284/saison-24580/
-* @description Allo Cine : Faux Raccord
-* @update 07/11/2013
-* initial maintainer: superbaillot.net
-*/
-class AllocineFRBridge extends BridgeAbstract{
+class AllocineFRBridge extends BridgeAbstract {
 
-    private $_URL = "http://www.allocine.fr/video/programme-12284/saison-24580/";
-    private $_NOM = "Faux Raccord";
-    
-    public function collectData(array $param){
-        $html = file_get_html($this->_URL) or $this->returnError('Could not request Allo cine.', 404);
+	const MAINTAINER = 'superbaillot.net';
+	const NAME = 'Allo Cine Bridge';
+	const CACHE_TIMEOUT = 25200; // 7h
+	const URI = 'http://www.allocine.fr/';
+	const DESCRIPTION = 'Bridge for allocine.fr';
+	const PARAMETERS = array( array(
+		'category' => array(
+			'name' => 'category',
+			'type' => 'list',
+			'required' => true,
+			'exampleValue' => 'Faux Raccord',
+			'title' => 'Select your category',
+			'values' => array(
+				'Faux Raccord' => 'faux-raccord',
+				'Top 5' => 'top-5',
+				'Tueurs en Séries' => 'tueurs-en-serie'
+			)
+		)
+	));
 
-        foreach($html->find('figure.media-meta-fig') as $element)
-        {
-            $item = new Item();
-            
-            $titre = $element->find('div.titlebar h3.title a', 0);
-            $content = trim($element->innertext);
-            
-            $figCaption = strpos($content, $this->_NOM);
-            if($figCaption !== false)
-            {
-                $content = str_replace('src="/', 'src="http://www.allocine.fr/',$content);
-                $content = str_replace('href="/', 'href="http://www.allocine.fr/',$content);
-                $content = str_replace('src=\'/', 'src=\'http://www.allocine.fr/',$content);
-                $content = str_replace('href=\'/', 'href=\'http://www.allocine.fr/',$content);
-                $item->content = $content;
-                $item->title = trim($titre->innertext);
-                $item->uri = "http://www.allocine.fr" . $titre->href;
-                $this->items[] = $item;
-            }
-        }
-    }
+	public function getURI(){
+		if(!is_null($this->getInput('category'))) {
 
-    public function getName(){
-        return 'Allo Cine : ' . $this->_NOM;
-    }
+			switch($this->getInput('category')) {
+			case 'faux-raccord':
+				$uri = static::URI . 'video/programme-12284/saison-32180/';
+				break;
+			case 'top-5':
+				$uri = static::URI . 'video/programme-12299/saison-29561/';
+				break;
+			case 'tueurs-en-serie':
+				$uri = static::URI . 'video/programme-12286/saison-22938/';
+				break;
+			}
 
-    public function getURI(){
-        return $this->_URL;
-    }
+			return $uri;
+		}
 
-    public function getCacheDuration(){
-        return 25200; // 7 hours
-    }
-    public function getDescription(){
-        return "Allo Cine : " . $this->_NOM . " via rss-bridge";
-    }
+		return parent::getURI();
+	}
+
+	public function getName(){
+		if(!is_null($this->getInput('category'))) {
+			return self::NAME . ' : '
+				.array_search(
+					$this->getInput('category'),
+					self::PARAMETERS[$this->queriedContext]['category']['values']
+				);
+		}
+
+		return parent::getName();
+	}
+
+	public function collectData(){
+
+		$html = getSimpleHTMLDOM($this->getURI())
+			or returnServerError('Could not request ' . $this->getURI() . ' !');
+
+		$category = array_search(
+				$this->getInput('category'),
+				self::PARAMETERS[$this->queriedContext]['category']['values']
+			);
+
+		foreach($html->find('.media-meta-list figure.media-meta-fig') as $element) {
+			$item = array();
+
+			$title = $element->find('div.titlebar h3.title a', 0);
+			$content = trim($element->innertext);
+			$figCaption = strpos($content, $category);
+
+			if($figCaption !== false) {
+				$content = str_replace('src="/', 'src="' . static::URI, $content);
+				$content = str_replace('href="/', 'href="' . static::URI, $content);
+				$content = str_replace('src=\'/', 'src=\'' . static::URI, $content);
+				$content = str_replace('href=\'/', 'href=\'' . static::URI, $content);
+				$item['content'] = $content;
+				$item['title'] = trim($title->innertext);
+				$item['uri'] = static::URI . $title->href;
+				$this->items[] = $item;
+			}
+		}
+	}
+
 }
-?>

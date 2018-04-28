@@ -1,41 +1,28 @@
 <?php
-/**
-* RssBridgeDansTonChat
-* Retrieve lastest quotes from DansTonChat.
-* Returns the most recent quotes, sorting by date (most recent first).
-* 2014-05-25
-*
-* @name DansTonChat Bridge
-* @homepage http://danstonchat.com/latest.html
-* @description Returns latest quotes from DansTonChat.
-* @maintainer Astalaseven
-*/
-class DansTonChatBridge extends BridgeAbstract{
+class DansTonChatBridge extends BridgeAbstract {
 
-    public function collectData(array $param){
-        $html = '';
-        $link = 'http://danstonchat.com/latest.html';
+	const MAINTAINER = 'Astalaseven';
+	const NAME = 'DansTonChat Bridge';
+	const URI = 'https://danstonchat.com/';
+	const CACHE_TIMEOUT = 21600; //6h
+	const DESCRIPTION = 'Returns latest quotes from DansTonChat.';
 
-        $html = file_get_html($link) or $this->returnError('Could not request DansTonChat.', 404);
+	public function collectData(){
 
-        foreach($html->find('div.item') as $element) {
-                $item = new \Item();
-                $item->uri = $element->find('a', 0)->href;
-                $item->title = 'DansTonChat '.$element->find('a', 1)->plaintext;
-                $item->content = $element->find('a', 0)->innertext;
-                $this->items[] = $item;
-        }
-    }
+		$html = getSimpleHTMLDOM(self::URI . 'latest.html')
+			or returnServerError('Could not request DansTonChat.');
 
-    public function getName(){
-        return 'DansTonChat';
-    }
-
-    public function getURI(){
-        return 'http://danstonchat.com';
-    }
-
-    public function getCacheDuration(){
-        return 21600; // 6 hours
-    }
+		foreach($html->find('div.item') as $element) {
+			$item = array();
+			$item['uri'] = $element->find('a', 0)->href;
+			$titleContent = $element->find('h3 a', 0);
+			if($titleContent) {
+				$item['title'] = 'DansTonChat ' . html_entity_decode($titleContent->plaintext, ENT_QUOTES);
+			} else {
+				$item['title'] = 'DansTonChat';
+			}
+			$item['content'] = $element->find('div.item-content a', 0)->innertext;
+			$this->items[] = $item;
+		}
+	}
 }

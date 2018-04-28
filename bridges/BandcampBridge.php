@@ -1,48 +1,63 @@
 <?php
-/**
-* BandcampTagRSS
-* 2014-05-25
-*
-* @name Bandcamp Tag
-* @homepage http://bandcamp.com/
-* @description New bandcamp release by tag
-* @maintainer sebsauvage
-* @use1(tag="tag")
-*/
-class BandcampBridge extends BridgeAbstract{
-    
-    private $request;
+class BandcampBridge extends BridgeAbstract {
 
-    public function collectData(array $param){
-        $html = '';
-        if (isset($param['tag'])) {
-            $this->request = $param['tag'];
-            $html = file_get_html('http://bandcamp.com/tag/'.urlencode($this->request).'?sort_field=date') or $this->returnError('No results for this query.', 404);
-        }
-        else {
-            $this->returnError('You must specify tag (/tag/...)', 400);
-        }
+	const MAINTAINER = 'sebsauvage';
+	const NAME = 'Bandcamp Tag';
+	const URI = 'https://bandcamp.com/';
+	const CACHE_TIMEOUT = 600; // 10min
+	const DESCRIPTION = 'New bandcamp release by tag';
+	const PARAMETERS = array( array(
+		'tag' => array(
+			'name' => 'tag',
+			'type' => 'text',
+			'required' => true
+		)
+	));
 
-        foreach($html->find('li.item') as $release) {
-            $item = new \Item();
-            $item->name = $release->find('div.itemsubtext',0)->plaintext . ' - ' . $release->find('div.itemtext',0)->plaintext;
-            $item->title = $release->find('div.itemsubtext',0)->plaintext . ' - ' . $release->find('div.itemtext',0)->plaintext;
-            $item->content = '<img src="' . $release->find('img.art',0)->src . '"/><br/>' . $release->find('div.itemsubtext',0)->plaintext . ' - ' . $release->find('div.itemtext',0)->plaintext;
-            $item->id = $release->find('a',0)->getAttribute('href');
-            $item->uri = $release->find('a',0)->getAttribute('href');
-            $this->items[] = $item;
-        }
-    }
+	public function collectData(){
+		$html = getSimpleHTMLDOM($this->getURI())
+			or returnServerError('No results for this query.');
 
-    public function getName(){
-        return (!empty($this->request) ? $this->request .' - ' : '') .'Bandcamp Tag';
-    }
+		foreach($html->find('li.item') as $release) {
+			$script = $release->find('div.art', 0)->getAttribute('onclick');
+			$uri = ltrim($script, "return 'url(");
+			$uri = rtrim($uri, "')");
 
-    public function getURI(){
-        return 'http://bandcamp.com';
-    }
+			$item = array();
+			$item['author'] = $release->find('div.itemsubtext', 0)->plaintext
+			. ' - '
+			. $release->find('div.itemtext', 0)->plaintext;
 
-    public function getCacheDuration(){
-        return 600; // 10 minutes
-    }
+			$item['title'] = $release->find('div.itemsubtext', 0)->plaintext
+			. ' - '
+			. $release->find('div.itemtext', 0)->plaintext;
+
+			$item['content'] = '<img src="'
+			. $uri
+			. '"/><br/>'
+			. $release->find('div.itemsubtext', 0)->plaintext
+			. ' - '
+			. $release->find('div.itemtext', 0)->plaintext;
+
+			$item['id'] = $release->find('a', 0)->getAttribute('href');
+			$item['uri'] = $release->find('a', 0)->getAttribute('href');
+			$this->items[] = $item;
+		}
+	}
+
+	public function getURI(){
+		if(!is_null($this->getInput('tag'))) {
+			return self::URI . 'tag/' . urlencode($this->getInput('tag')) . '?sort_field=date';
+		}
+
+		return parent::getURI();
+	}
+
+	public function getName(){
+		if(!is_null($this->getInput('tag'))) {
+			return $this->getInput('tag') . ' - Bandcamp Tag';
+		}
+
+		return parent::getName();
+	}
 }

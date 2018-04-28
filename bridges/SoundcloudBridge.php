@@ -1,55 +1,64 @@
 <?php
-/**
-* SoundcloudBridge
-* Returns the newest music from user
-*
-* @name Soundcloud Bridge
-* @homepage http://www.soundcloud.com/
-* @description Returns 10 newest music from user profile 
-* @maintainer kranack
-* @update 2014-07-24
-* @use1(u="username")
-*
-*/
-class SoundCloudBridge extends BridgeAbstract{
-    
-	private $request;
-	private $name;
-    
-	public function collectData(array $param){
-		
-		if (isset($param['u']) && !empty($param['u']))
-		{
-			$this->request = $param['u'];
-           	
-			$res = json_decode(file_get_contents('http://api.soundcloud.com/resolve.json?url=http://www.soundcloud.com/'. urlencode($this->request) .'&consumer_key=apigee')) or $this->returnError('No results for this query', 404);
-			$tracks = json_decode(file_get_contents('http://api.soundcloud.com/users/'. urlencode($res->id) .'/tracks.json?consumer_key=apigee')) or $this->returnError('No results for this user', 404);
-		} 
-		else
-		{
-			$this->returnError('You must specify username', 400);
+class SoundCloudBridge extends BridgeAbstract {
+
+	const MAINTAINER = 'kranack';
+	const NAME = 'Soundcloud Bridge';
+	const URI = 'https://soundcloud.com/';
+	const CACHE_TIMEOUT = 600; // 10min
+	const DESCRIPTION = 'Returns 10 newest music from user profile';
+
+	const PARAMETERS = array( array(
+		'u' => array(
+			'name' => 'username',
+			'required' => true
+		)
+	));
+
+	const CLIENT_ID = '4jkoEFmZEDaqjwJ9Eih4ATNhcH3vMVfp';
+
+	public function collectData(){
+
+		$res = json_decode(getContents(
+			'https://api.soundcloud.com/resolve?url=http://www.soundcloud.com/'
+			. urlencode($this->getInput('u'))
+			. '&client_id='
+			. self::CLIENT_ID
+		)) or returnServerError('No results for this query');
+
+		$tracks = json_decode(getContents(
+			'https://api.soundcloud.com/users/'
+			. urlencode($res->id)
+			. '/tracks?client_id='
+			. self::CLIENT_ID
+		)) or returnServerError('No results for this user');
+
+		for($i = 0; $i < 10; $i++) {
+			$item = array();
+			$item['author'] = $tracks[$i]->user->username . ' - ' . $tracks[$i]->title;
+			$item['title'] = $tracks[$i]->user->username . ' - ' . $tracks[$i]->title;
+			$item['content'] = '<audio src="'
+			. $tracks[$i]->uri
+			. '/stream?client_id='
+			. self::CLIENT_ID
+			. '">';
+
+			$item['id'] = self::URI
+				. urlencode($this->getInput('u'))
+				. '/'
+				. urlencode($tracks[$i]->permalink);
+			$item['uri'] = self::URI
+				. urlencode($this->getInput('u'))
+				. '/'
+				. urlencode($tracks[$i]->permalink);
+			$this->items[] = $item;
 		}
 
-		for ($i=0; $i < 10; $i++) {
-		    $item = new \Item();
-		    $item->name = $tracks[$i]->user->username .' - '. $tracks[$i]->title;
-		    $item->title = $tracks[$i]->user->username .' - '. $tracks[$i]->title;
-		    $item->content = '<audio src="'. $tracks[$i]->uri .'/stream?consumer_key=apigee">';
-		    $item->id = 'https://soundcloud.com/'. urlencode($this->request) .'/'. urlencode($tracks[$i]->permalink);
-		    $item->uri = 'https://soundcloud.com/'. urlencode($this->request) .'/'. urlencode($tracks[$i]->permalink);
-		    $this->items[] = $item;
-		}
-		
-    }
+	}
 	public function getName(){
-		return (!empty($this->name) ? $this->name .' - ' : '') .'Soundcloud Bridge';
-	}
+		if(!is_null($this->getInput('u'))) {
+			return self::NAME . ' - ' . $this->getInput('u');
+		}
 
-	public function getURI(){
-		return 'http://www.soundcloud.com/';
-	}
-
-	public function getCacheDuration(){
-		return 600; // 10 minutes
+		return parent::getName();
 	}
 }

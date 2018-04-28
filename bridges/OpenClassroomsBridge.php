@@ -1,47 +1,49 @@
 <?php
-/**
-* RssBridgeOpenClassrooms
-* Retrieve lastest tutorials from OpenClassrooms.
-* Returns the most recent tutorials, sorting by date (most recent first).
-* 2014-05-25
-*
-* @name OpenClassrooms Bridge
-* @homepage http://fr.openclassrooms.com/
-* @description Returns latest tutorials from OpenClassrooms.
-* @maintainer sebsauvage
-* @use1(u="informatique or sciences")
-*/
-class OpenClassroomsBridge extends BridgeAbstract{
+class OpenClassroomsBridge extends BridgeAbstract {
 
-    public function collectData(array $param){
-        if ($param['u']!='informatique' && $param['u']!='sciences')
-        {
-            $this->returnError('Error: You must chose "informatique" or "science".', 404);
-        }
-    
-        $html = '';
-        $link = 'http://fr.openclassrooms.com/'.$param['u'].'/cours?title=&sort=updatedAt+desc';
+	const MAINTAINER = 'sebsauvage';
+	const NAME = 'OpenClassrooms Bridge';
+	const URI = 'https://openclassrooms.com/';
+	const CACHE_TIMEOUT = 21600; // 6h
+	const DESCRIPTION = 'Returns latest tutorials from OpenClassrooms.';
 
-        $html = file_get_html($link) or $this->returnError('Could not request OpenClassrooms.', 404);
+	const PARAMETERS = array( array(
+		'u' => array(
+			'name' => 'Catégorie',
+			'type' => 'list',
+			'required' => true,
+			'values' => array(
+				'Arts & Culture' => 'arts',
+				'Code' => 'code',
+				'Design' => 'design',
+				'Entreprise' => 'business',
+				'Numérique' => 'digital',
+				'Sciences' => 'sciences',
+				'Sciences Humaines' => 'humainities',
+				'Systèmes d\'information' => 'it',
+				'Autres' => 'others'
+			)
+		)
+	));
 
-        foreach($html->find('li.col6') as $element) {
-                $item = new \Item();
-                $item->uri = 'http://fr.openclassrooms.com'.$element->find('a', 0)->href;
-                $item->title = $element->find('div.courses-content strong', 0)->innertext;
-                $item->content = $element->find('span.course-tags', 0)->innertext;
-                $this->items[] = $item;
-        }
-    }
+	public function getURI(){
+		if(!is_null($this->getInput('u'))) {
+			return self::URI . '/courses?categories=' . $this->getInput('u') . '&title=&sort=updatedAt+desc';
+		}
 
-    public function getName(){
-        return 'OpenClassrooms';
-    }
+		return parent::getURI();
+	}
 
-    public function getURI(){
-        return 'http://fr.openclassrooms.com';
-    }
+	public function collectData(){
+		$html = getSimpleHTMLDOM($this->getURI())
+			or returnServerError('Could not request OpenClassrooms.');
 
-    public function getCacheDuration(){
-        return 21600; // 6 hours
-    }
+		foreach($html->find('.courseListItem') as $element) {
+				$item = array();
+				$item['uri'] = self::URI . $element->find('a', 0)->href;
+				$item['title'] = $element->find('h3', 0)->plaintext;
+				$item['content'] = $element->find('slidingItem__descriptionContent', 0)->plaintext;
+				$this->items[] = $item;
+		}
+	}
 }

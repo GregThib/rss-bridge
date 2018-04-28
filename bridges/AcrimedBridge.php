@@ -1,52 +1,25 @@
 <?php
-/**
-* 2014-05-25
-* @name Acrimed Bridge
-* @homepage http://www.acrimed.org/
-* @description Returns the newest articles.
-* @maintainer qwertygc
-*/
-class AcrimedBridge extends BridgeAbstract{
-    
-        public function collectData(array $param){
+class AcrimedBridge extends FeedExpander {
 
-			function StripCDATA($string) {
-			$string = str_replace('<![CDATA[', '', $string);
-			$string = str_replace(']]>', '', $string);
-			return $string;
-		}
-		function ExtractContent($url) {
-		$html2 = file_get_html($url);
-		$text = $html2->find('div.texte', 0)->innertext;
-		return $text;
-		}
-		$html = file_get_html('http://www.acrimed.org/spip.php?page=backend') or $this->returnError('Could not request Acrimed.', 404);
-		$limit = 0;
+	const MAINTAINER = 'qwertygc';
+	const NAME = 'Acrimed Bridge';
+	const URI = 'http://www.acrimed.org/';
+	const CACHE_TIMEOUT = 4800; //2hours
+	const DESCRIPTION = 'Returns the newest articles';
 
-		foreach($html->find('item') as $element) {
-		 if($limit < 10) {
-		 $item = new \Item();
-		 $item->title = StripCDATA($element->find('title', 0)->innertext);
-		 $item->uri = StripCDATA($element->find('guid', 0)->plaintext);
-		 $item->timestamp = strtotime($element->find('pubDate', 0)->plaintext);
-		 $item->content = ExtractContent($item->uri);
-		 $this->items[] = $item;
-		 $limit++;
-		 }
-		}
-    
-    }
+	public function collectData(){
+		$this->collectExpandableDatas(static::URI . 'spip.php?page=backend');
+	}
 
-    public function getName(){
-        return 'Acrimed Bridge';
-    }
+	protected function parseItem($newsItem){
+		$item = parent::parseItem($newsItem);
 
-    public function getURI(){
-        return 'http://acrimed.org/';
-    }
+		$articlePage = getSimpleHTMLDOM($newsItem->link);
+		$article = sanitize($articlePage->find('article.article1', 0)->innertext);
+		$article = defaultLinkTo($article, static::URI);
+		$item['content'] = $article;
 
-    public function getCacheDuration(){
-        return 3600*2; // 2 hours
-        // return 0; // 2 hours
-    }
+		return $item;
+	}
+
 }

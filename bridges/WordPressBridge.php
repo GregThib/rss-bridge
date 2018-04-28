@@ -1,95 +1,76 @@
 <?php
+class WordPressBridge extends FeedExpander {
+	const MAINTAINER = 'aledeg';
+	const NAME = 'Wordpress Bridge';
+	const URI = 'https://wordpress.org/';
+	const CACHE_TIMEOUT = 10800; // 3h
+	const DESCRIPTION = 'Returns the newest full posts of a Wordpress powered website';
 
-/**
- * RssBridgeWordpress
- * Returns the 3 newest full posts of a Wordpress blog
- *
- * @name Wordpress Bridge
- * @homepage https://wordpress.com/
- * @description Returns the 3 newest full posts of a Wordpress blog
- * @maintainer aledeg
- * @update 2014-05-26
- * @use1(url="blog URL (required)", name="blog name")
- */
-class WordPressBridge extends BridgeAbstract {
+	const PARAMETERS = array( array(
+		'url' => array(
+			'name' => 'Blog URL',
+			'required' => true
+		)
+	));
 
-	private $url;
-	private $name;
-
-	public function collectData(array $param) {
-		$this->processParams($param);
-
-		if (!$this->hasUrl()) {
-			$this->returnError('You must specify a URL', 400);
-		}
-
-		$html = file_get_html($this->url) or $this->returnError("Could not request {$this->url}.", 404);
-
-                $posts = $html->find('.post');
-		if(!empty($posts) ) {
-			$i=0;
-			foreach ($html->find('.post') as $article) {
-				if($i < 3) {
-					$uri = $article->find('a', 0)->href;
-					$this->items[] = $this->getDetails($uri);
-					$i++;
-				}
-			}
-		}
-		else {
-			$this->returnError("Sorry, {$this->url} doesn't seem to be a Wordpress blog.", 404);
-		}
+	private function clearContent($content){
+		$content = preg_replace('/<script[^>]*>[^<]*<\/script>/', '', $content);
+		$content = preg_replace('/<div class="wpa".*/', '', $content);
+		$content = preg_replace('/<form.*\/form>/', '', $content);
+		return $content;
 	}
 
-	private function getDetails($uri) {
-		$html = file_get_html($uri) or exit;
+	protected function parseItem($newItem){
+		$item = parent::parseItem($newItem);
 
-		$item = new \Item();
+		$article_html = getSimpleHTMLDOMCached($item['uri']);
 
-		$article = $html->find('.post', 0);
-		$item->uri = $uri;
-		$item->title = $article->find('h1', 0)->innertext;
-		$item->content = $this->clearContent($article->find('.entry-content,.entry', 0)->innertext);
-		$item->timestamp = $this->getDate($uri);
+		$article = null;
+		switch(true) {
+		case !is_null($article_html->find('article', 0)):
+			// most common content div
+			$article = $article_html->find('article', 0);
+			break;
+		case !is_null($article_html->find('.single-content', 0)):
+			// another common content div
+			$article = $article_html->find('.single-content', 0);
+			break;
+		case !is_null($article_html->find('.post-content', 0)):
+			// another common content div
+			$article = $article_html->find('.post-content', 0);
+			break;
+
+		case !is_null($article_html->find('.post', 0)):
+			// for old WordPress themes without HTML5
+			$article = $article_html->find('.post', 0);
+			break;
+		}
+
+		if(!is_null($article)) {
+			$item['content'] = $this->clearContent($article->innertext);
+		}
 
 		return $item;
 	}
 
-	private function clearContent($content) {
-		$content = preg_replace('/<script.*\/script>/', '', $content);
-		$content = preg_replace('/<div class="wpa".*/', '', $content);
-		return $content;
-	}
-
-	private function getDate($uri) {
-		preg_match('/\d{4}\/\d{2}\/\d{2}/', $uri, $matches);
-		$date = new \DateTime($matches[0]);
-		return $date->format('U');
-	}
-
-	public function getName() {
-		return "{$this->name} - Wordpress Bridge";
-	}
-
-	public function getURI() {
-		return $this->url;
-	}
-
-	public function getCacheDuration() {
-		return 3600*3; // 3 hours
-	}
-
-	private function hasUrl() {
-		if (empty($this->url)) {
-			return false;
+	public function getURI(){
+		$url = $this->getInput('url');
+		if(empty($url)) {
+			$url = parent::getURI();
 		}
-		return true;
+		return $url;
 	}
 
-	private function processParams($param) {
-		$this->url = $param['url'];
-		$this->name = $param['name'];
-	}
+	public function collectData(){
+		if($this->getInput('url') && substr($this->getInput('url'), 0, strlen('http')) !== 'http') {
+			// just in case someone find a way to access local files by playing with the url
+			returnClientError('The url parameter must either refer to http or https protocol.');
+		}
+		try{
+			$this->collectExpandableDatas($this->getURI() . '/feed/atom/');
+		} catch (HttpException $e) {
+			$this->collectExpandableDatas($this->getURI() . '/?feed=atom');
+		}
 
+	}
 }
-

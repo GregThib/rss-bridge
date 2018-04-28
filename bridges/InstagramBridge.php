@@ -1,81 +1,120 @@
 <?php
-/**
- * RssBridgeInstagram
- * Returns the newest photos
-* 2014-05-25
- *
- * @name Instagram Bridge
-* @homepage http://instagram.com/
- * @description Returns the newest images
-* @maintainer pauder
- * @use1(u="username")
- */
-class InstagramBridge extends BridgeAbstract{
-    
-    private $request;
-    
-    public function collectData(array $param){
-        $html = '';
-        if (isset($param['u'])) {   /* user timeline mode */
-            $this->request = $param['u'];
-            $html = file_get_html('http://instagram.com/'.urlencode($this->request)) or $this->returnError('Could not request Instagram.', 404);
-        }
-        else {
-            $this->returnError('You must specify a Instagram username (?u=...).', 400);
-        }
-        
-        $innertext = null;
-        
-        foreach($html->find('script') as $script)
-        {
-        	if ('' === $script->innertext) {
-        		continue;
-        	}
-        	
-        	$pos = strpos(trim($script->innertext), 'window._sharedData');
-        	if (0 !== $pos)
-        	{
-        		continue;
-        	}
-        	
-        	$innertext = $script->innertext;
-        	break;
-        }
+class InstagramBridge extends BridgeAbstract {
 
-        $json = trim(substr($innertext, $pos+18), ' =;');
-        $data = json_decode($json);
-        
-        
-        
-        $userMedia = $data->entry_data->ProfilePage[0]->user->media->nodes;
+	const MAINTAINER = 'pauder';
+	const NAME = 'Instagram Bridge';
+	const URI = 'https://instagram.com/';
+	const DESCRIPTION = 'Returns the newest images';
 
-        foreach($userMedia as $media)
-        {
+	const PARAMETERS = array(
+		array(
+			'u' => array(
+				'name' => 'username',
+				'required' => true
+			),
+			'media_type' => array(
+				'name' => 'Media type',
+				'type' => 'list',
+				'required' => false,
+				'values' => array(
+					'Both' => 'all',
+					'Video' => 'video',
+					'Picture' => 'picture'
+				),
+				'defaultValue' => 'all'
+			)
+		),
+		array(
+			'h' => array(
+				'name' => 'hashtag',
+				'required' => true
+			),
+			'media_type' => array(
+				'name' => 'Media type',
+				'type' => 'list',
+				'required' => false,
+				'values' => array(
+					'Both' => 'all',
+					'Video' => 'video',
+					'Picture' => 'picture'
+				),
+				'defaultValue' => 'all'
+			)
+		)
+	);
 
-        	$item = new \Item();
-        	$item->uri = "https://instagram.com/p/".$media->code."/";
-        	$item->content = '<img src="' . htmlentities($media->display_src) . '" />';
-        	if (isset($media->caption))
-        	{
-        		$item->title = $media->caption;
-        	} else {
-        		$item->title = basename($media->display_src);
-        	}
-        	$item->timestamp = $media->date;
-        	$this->items[] = $item;
-        	
-        }
-    }
+	public function collectData(){
+		$html = getSimpleHTMLDOM($this->getURI())
+			or returnServerError('Could not request Instagram.');
 
-    public function getName(){
-        return (!empty($this->request) ? $this->request .' - ' : '') .'Instagram Bridge';
-    }
+		$innertext = null;
 
-    public function getURI(){
-        return 'http://instagram.com/';
-    }
+		foreach($html->find('script') as $script) {
+			if('' === $script->innertext) {
+				continue;
+			}
 
-    public function getCacheDuration(){
-        return 3600; 
-    }
+			$pos = strpos(trim($script->innertext), 'window._sharedData');
+			if(0 !== $pos) {
+				continue;
+			}
+
+			$innertext = $script->innertext;
+			break;
+		}
+
+		$json = trim(substr($innertext, $pos + 18), ' =;');
+		$data = json_decode($json);
+
+		if(!is_null($this->getInput('u'))) {
+			$userMedia = $data->entry_data->ProfilePage[0]->graphql->user->edge_owner_to_timeline_media->edges;
+		} else {
+			$userMedia = $data->entry_data->TagPage[0]->graphql->hashtag->edge_hashtag_to_media->edges;
+		}
+
+		foreach($userMedia as $media) {
+			$media = $media->node;
+			// Check media type
+			switch($this->getInput('media_type')) {
+				case 'all': break;
+				case 'video':
+					if($media->is_video === false) continue 2;
+					break;
+				case 'picture':
+					if($media->is_video === true) continue 2;
+					break;
+				default: break;
+			}
+
+			$item = array();
+			$item['uri'] = self::URI . 'p/' . $media->shortcode . '/';
+			$item['content'] = '<img src="' . htmlentities($media->display_url) . '" />';
+			if (isset($media->edge_media_to_caption->edges[0]->node->text)) {
+				$item['title'] = $media->edge_media_to_caption->edges[0]->node->text;
+			} else {
+				$item['title'] = basename($media->display_url);
+			}
+			$item['timestamp'] = $media->taken_at_timestamp;
+			$item['enclosures'] = array($media->display_url);
+			$this->items[] = $item;
+		}
+	}
+
+	public function getName(){
+		if(!is_null($this->getInput('u'))) {
+			return $this->getInput('u') . ' - Instagram Bridge';
+		}
+
+		return parent::getName();
+	}
+
+	public function getURI(){
+		if(!is_null($this->getInput('u'))) {
+			return self::URI . urlencode($this->getInput('u'));
+		} elseif(!is_null($this->getInput('h'))) {
+			return self::URI . 'explore/tags/' . urlencode($this->getInput('h'));
+		}
+
+		return parent::getURI();
+	}
 }

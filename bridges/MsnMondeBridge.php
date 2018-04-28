@@ -1,47 +1,35 @@
 <?php
-/**
-* RssBridgeMsnMonde
-* Returns the 10 newest posts from MSN Actualités (full text)
-*
-* @name MSN Actu Monde
-* @homepage http://www.msn.com/fr-fr/actualite/monde
-* @description Returns the 10 newest posts from MSN Actualités (full text)
-* @maintainer kranack
-* @update 2015-01-30
-*/
-class MsnMondeBridge extends BridgeAbstract{
+class MsnMondeBridge extends BridgeAbstract {
 
-    public function collectData(array $param){
+	const MAINTAINER = 'kranack';
+	const NAME = 'MSN Actu Monde';
+	const URI = 'http://www.msn.com/';
+	const DESCRIPTION = 'Returns the 10 newest posts from MSN Actualités (full text)';
 
-    function MsnMondeExtractContent($url, &$item) {
-      $html2 = file_get_html($url);
-      $item->content = $html2->find('#content', 0)->find('article', 0)->find('section', 0)->plaintext;
-      $item->timestamp = strtotime($html2->find('.authorinfo-txt', 0)->find('time', 0)->datetime);
-    }
+	public function getURI(){
+		return self::URI . 'fr-fr/actualite/monde';
+	}
 
-      $html = file_get_html('http://www.msn.com/fr-fr/actualite/monde') or $this->returnError('Could not request MsnMonde.', 404);
-      $limit = 0;
-      foreach($html->find('.smalla') as $article) {
-       if($limit < 10) {
-         $item = new \Item();
-         $item->title = utf8_decode($article->find('h4', 0)->innertext);
-         $item->uri = "http://www.msn.com" . utf8_decode($article->find('a', 0)->href);
-         MsnMondeExtractContent($item->uri, $item);
-         $this->items[] = $item;
-         $limit++;
-       }
-      }
-    }
+	private function msnMondeExtractContent($url, &$item){
+		$html2 = getSimpleHTMLDOM($url);
+		$item['content'] = $html2->find('#content', 0)->find('article', 0)->find('section', 0)->plaintext;
+		$item['timestamp'] = strtotime($html2->find('.authorinfo-txt', 0)->find('time', 0)->datetime);
+	}
 
-    public function getName(){
-        return 'MSN Actu Monde';
-    }
+	public function collectData(){
+		$html = getSimpleHTMLDOM($this->getURI())
+			or returnServerError('Could not request MsnMonde.');
 
-    public function getURI(){
-        return 'http://www.msn.com/fr-fr/actualite/monde';
-    }
-
-    public function getCacheDuration(){
-        return 3600; // 1 hour
-    }
+		$limit = 0;
+		foreach($html->find('.smalla') as $article) {
+			if($limit < 10) {
+				$item = array();
+				$item['title'] = utf8_decode($article->find('h4', 0)->innertext);
+				$item['uri'] = self::URI . utf8_decode($article->find('a', 0)->href);
+				$this->msnMondeExtractContent($item['uri'], $item);
+				$this->items[] = $item;
+				$limit++;
+			}
+		}
+	}
 }

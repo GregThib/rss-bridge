@@ -1,52 +1,35 @@
 <?php
-/**
-* RssBridgeGelbooru
-* Returns images from given page
-* 2014-05-25
-*
-* @name Gelbooru
-* @homepage http://gelbooru.com/
-* @description Returns images from given page
-* @maintainer mitsukarenai
-* @use1(p="page", t="tags")
-*/
-class GelbooruBridge extends BridgeAbstract{
+require_once('DanbooruBridge.php');
 
-    public function collectData(array $param){
-	$page = 0;
-        if (isset($param['p'])) { 
-		$page = (int)preg_replace("/[^0-9]/",'', $param['p']); 
-		$page = $page - 1;
-		$page = $page * 63;
-        }
-        if (isset($param['t'])) { 
-            $tags = urlencode($param['t']); 
-        }
-        $html = file_get_html("http://gelbooru.com/index.php?page=post&s=list&tags=$tags&pid=$page") or $this->returnError('Could not request Gelbooru.', 404);
+class GelbooruBridge extends DanbooruBridge {
 
+	const MAINTAINER = 'mitsukarenai';
+	const NAME = 'Gelbooru';
+	const URI = 'http://gelbooru.com/';
+	const DESCRIPTION = 'Returns images from given page';
 
-	foreach($html->find('div[class=content] span') as $element) {
-		$item = new \Item();
-		$item->uri = 'http://gelbooru.com/'.$element->find('a', 0)->href;
-		$item->postid = (int)preg_replace("/[^0-9]/",'', $element->getAttribute('id'));	
-		$item->timestamp = time();
-		$item->thumbnailUri = $element->find('img', 0)->src;
-		$item->tags = $element->find('img', 0)->getAttribute('alt');
-		$item->title = 'Gelbooru | '.$item->postid;
-		$item->content = '<a href="' . $item->uri . '"><img src="' . $item->thumbnailUri . '" /></a><br>Tags: '.$item->tags;
-		$this->items[] = $item; 
+	const PATHTODATA = '.thumb';
+	const IDATTRIBUTE = 'id';
+	const TAGATTRIBUTE = 'title';
+
+	const PIDBYPAGE = 63;
+
+	protected function getFullURI(){
+		return $this->getURI()
+		. 'index.php?page=post&s=list&pid='
+		. ($this->getInput('p') ? ($this->getInput('p') - 1) * static::PIDBYPAGE : '')
+		. '&tags=' . urlencode($this->getInput('t'));
 	}
-    }
 
-    public function getName(){
-        return 'Gelbooru';
-    }
+	protected function getTags($element){
+		$tags = parent::getTags($element);
+		$tags = explode(' ', $tags);
 
-    public function getURI(){
-        return 'http://gelbooru.com/';
-    }
+		// Remove statistics from the tags list (identified by colon)
+		foreach($tags as $key => $tag) {
+			if(strpos($tag, ':') !== false) unset($tags[$key]);
+		}
 
-    public function getCacheDuration(){
-        return 1800; // 30 minutes
-    }
+		return implode(' ', $tags);
+	}
 }

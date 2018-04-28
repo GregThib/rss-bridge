@@ -1,48 +1,42 @@
 <?php
-/**
-* RssBridgeScoopIt
-* Search DScoopIt for most recent pages regarding a specific topic.
-* Returns the most recent links in results, sorting by date (most recent first).
-* 2014-06-13
-*
-* @name ScoopIt
-* @homepage http://www.scoop.it
-* @description Returns most recent results from ScoopIt.
-* @maintainer Pitchoule
-* @use1(u="keyword")
-*/
-class ScoopItBridge extends BridgeAbstract{
+class ScoopItBridge extends BridgeAbstract {
 
-    public function collectData(array $param){
-        $html = '';
-        if ($param['u'] != '') {
-            $this->request = $param['u'];
-            $link = 'http://scoop.it/search?q=' .urlencode($this->request);
-            
-            $html = file_get_html($link) or $this->returnError('Could not request ScoopIt. for : ' . $link , 404);
-            
-            foreach($html->find('div.post-view') as $element) {
-                $item = new Item();
-                $item->uri = $element->find('a', 0)->href;
-                $item->title = preg_replace('~[[:cntrl:]]~', '', $element->find('div.tCustomization_post_title',0)->plaintext);
-                $item->content = preg_replace('~[[:cntrl:]]~', '', $element->find('div.tCustomization_post_description', 0)->plaintext);
-                $this->items[] = $item;
-            }
-        } else {
-            $this->returnError('You must specify a keyword', 404);
-        }
-    }
+	const MAINTAINER = 'Pitchoule';
+	const NAME = 'ScoopIt';
+	const URI = 'http://www.scoop.it/';
+	const CACHE_TIMEOUT = 21600; // 6h
+	const DESCRIPTION = 'Returns most recent results from ScoopIt.';
 
-    public function getName(){
-        return 'ScooptIt';
-    }
+	const PARAMETERS = array( array(
+		'u' => array(
+			'name' => 'keyword',
+			'required' => true
+		)
+	));
 
-    public function getURI(){
-        return 'http://Scoop.it';
-    }
+	public function collectData(){
+		$this->request = $this->getInput('u');
+		$link = self::URI . 'search?q=' . urlencode($this->getInput('u'));
 
-    public function getCacheDuration(){
-        return 21600; // 6 hours
-    }
+		$html = getSimpleHTMLDOM($link)
+			or returnServerError('Could not request ScoopIt. for : ' . $link);
+
+		foreach($html->find('div.post-view') as $element) {
+			$item = array();
+			$item['uri'] = $element->find('a', 0)->href;
+			$item['title'] = preg_replace(
+				'~[[:cntrl:]]~',
+				'',
+				$element->find('div.tCustomization_post_title', 0)->plaintext
+			);
+
+			$item['content'] = preg_replace(
+				'~[[:cntrl:]]~',
+				'',
+				$element->find('div.tCustomization_post_description', 0)->plaintext
+			);
+
+			$this->items[] = $item;
+		}
+	}
 }
-
